@@ -318,6 +318,22 @@ function e(string $value): string
             opacity: .6;
         }
 
+        .draft-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+
+            margin-top: 16px;
+        }
+
+        .secondary-button {
+            background: #343434;
+        }
+
+        .secondary-button:hover:not(:disabled) {
+            background: #484848;
+        }
+
         @media (max-width: 700px) {
             .app {
                 width: min(100% - 20px, 960px);
@@ -453,12 +469,25 @@ function e(string $value): string
         placeholder="Your generated post will appear here..."
     ></textarea>
 
-    <div
-        id="draft-note"
-        class="future-note"
-    >
-        Generated drafts are not saved yet.
-        Persistence comes in the next milestone.
+    <div class="draft-actions">
+
+        <button
+            type="button"
+            id="save-draft-button"
+            class="secondary-button"
+            disabled
+        >
+            Save Draft
+        </button>
+
+        <span
+            id="draft-status"
+            class="generation-status"
+            aria-live="polite"
+        ></span>
+        
+        <input type="hidden" id="draft-id" value="">
+
     </div>
 
 </section>
@@ -482,6 +511,15 @@ function e(string $value): string
 
     const draftMeta =
         document.getElementById('draft-meta');
+
+    const saveDraftButton =
+        document.getElementById('save-draft-button');
+
+    const draftStatus =
+        document.getElementById('draft-status');
+
+    const draftId =
+        document.getElementById('draft-id');
 
     if (
         !form ||
@@ -557,6 +595,15 @@ function e(string $value): string
 
             draft.value = data.post;
 
+            draftId.value = '';
+
+            saveDraftButton.disabled = false;
+
+            draftStatus.classList.remove('error');
+
+            draftStatus.textContent =
+                'Unsaved draft.';
+
             draftMeta.hidden = false;
 
             draftMeta.innerHTML = '';
@@ -615,6 +662,139 @@ function e(string $value): string
             draft.classList.remove(
                 'is-generating'
             );
+        }
+    });
+
+    saveDraftButton.addEventListener(
+        'click',
+        async () => {
+
+            if (
+                !draft.value.trim() ||
+                saveDraftButton.disabled
+            ) {
+                return;
+            }
+
+            const originalText =
+                saveDraftButton.textContent;
+
+            saveDraftButton.disabled = true;
+            saveDraftButton.textContent = 'Saving...';
+
+            document.body.classList.add('is-busy');
+
+            draftStatus.classList.remove('error');
+            draftStatus.textContent =
+                'Saving draft...';
+
+            const postTypeSelect =
+                document.getElementById('post_type');
+
+            const imagePreferenceSelect =
+                document.getElementById(
+                    'image_preference'
+                );
+
+            const topicField =
+                document.getElementById('topic');
+
+            const formData = new FormData();
+
+            formData.set(
+                'id',
+                draftId.value
+            );
+
+            formData.set(
+                'post_type',
+                postTypeSelect.value
+            );
+
+            formData.set(
+                'topic',
+                topicField.value
+            );
+
+            formData.set(
+                'image_preference',
+                imagePreferenceSelect.value
+            );
+
+            formData.set(
+                'content',
+                draft.value
+            );
+
+            try {
+
+                const response = await fetch(
+                    '/api/save-draft.php',
+                    {
+                        method: 'POST',
+                        body: formData,
+                        headers: {
+                            'Accept': 'application/json'
+                        }
+                    }
+                );
+
+                const data = await response.json();
+
+                if (
+                    !response.ok ||
+                    !data.success
+                ) {
+                    throw new Error(
+                        data.error ||
+                        'Unable to save draft.'
+                    );
+                }
+
+                draftId.value = data.id;
+
+                draftStatus.textContent =
+                    'Draft saved.';
+
+            } catch (error) {
+
+                console.error(error);
+
+                draftStatus.classList.add('error');
+
+                draftStatus.textContent =
+                    error.message ||
+                    'Unable to save draft.';
+
+            } finally {
+
+                saveDraftButton.disabled = false;
+
+                saveDraftButton.textContent =
+                    originalText;
+
+                document.body.classList.remove(
+                    'is-busy'
+                );
+            }
+        }
+    );
+
+    draft.addEventListener('input', () => {
+
+        if (!draft.value.trim()) {
+            saveDraftButton.disabled = true;
+            draftStatus.textContent = '';
+            return;
+        }
+
+        saveDraftButton.disabled = false;
+
+        if (draftId.value) {
+            draftStatus.classList.remove('error');
+
+            draftStatus.textContent =
+                'Unsaved changes.';
         }
     });
 
