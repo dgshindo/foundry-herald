@@ -230,4 +230,55 @@ final class PostRepository
 
         return $statement->fetchAll();
     }
+
+    public function markPublished(
+        int $id,
+        string $facebookPostId
+    ): void {
+        $db = Database::connection();
+
+        $statement = $db->prepare(
+            '
+            UPDATE posts
+            SET
+                status = \'published\',
+                published_at = CURRENT_TIMESTAMP,
+                facebook_post_id = :facebook_post_id,
+                publish_error = NULL
+            WHERE id = :id
+            AND status = \'approved\'
+            '
+        );
+
+        $statement->execute([
+            'id' => $id,
+            'facebook_post_id' => $facebookPostId,
+        ]);
+
+        if ($statement->rowCount() === 0) {
+            throw new \RuntimeException(
+                'Only approved posts can be published.'
+            );
+        }
+    }
+
+    public function recordPublishError(
+        int $id,
+        string $error
+    ): void {
+        $db = Database::connection();
+
+        $statement = $db->prepare(
+            '
+            UPDATE posts
+            SET publish_error = :publish_error
+            WHERE id = :id
+            '
+        );
+
+        $statement->execute([
+            'id' => $id,
+            'publish_error' => $error,
+        ]);
+    }
 }

@@ -464,6 +464,14 @@ function e(string $value): string
             color: #dc8585;
         }
 
+        .publish-button {
+            background: #365899;
+        }
+
+        .publish-button:hover:not(:disabled) {
+            background: #4267b2;
+        }
+
         @media (max-width: 700px) {
             .history-item {
                 grid-template-columns: 1fr;
@@ -641,6 +649,15 @@ function e(string $value): string
             Approve
         </button>
 
+        <button
+            type="button"
+            id="publish-button"
+            class="publish-button"
+            hidden
+        >
+            Publish to Facebook
+        </button>
+
         <span id="draft-status" class="generation-status" aria-live="polite"></span>
 
     </div>
@@ -713,6 +730,11 @@ function e(string $value): string
     const refreshHistoryButton =
         document.getElementById(
             'refresh-history-button'
+        );
+
+    const publishButton =
+        document.getElementById(
+            'publish-button'
         );
 
     const postTypeLabels = {
@@ -888,6 +910,9 @@ function e(string $value): string
             generating = false;
 
             generateButton.disabled = false;
+
+            publishButton.hidden = true;
+            publishButton.disabled = true;
 
             generateButton.textContent =
                 originalButtonText;
@@ -1116,6 +1141,15 @@ function e(string $value): string
             saveDraftButton.disabled = true;
             approveButton.disabled = true;
             rejectButton.disabled = true;
+
+            if (status === 'approved') {
+                publishButton.hidden = false;
+                publishButton.disabled = false;
+            }
+            if (status === 'rejected') {
+                publishButton.hidden = true;
+                publishButton.disabled = true;
+            }
 
         } catch (error) {
 
@@ -1408,6 +1442,14 @@ function e(string $value): string
                 document.getElementById(
                     'image_preference'
                 );
+            const canPublish =
+                post.status === 'approved';
+
+            publishButton.hidden =
+                !canPublish;
+
+            publishButton.disabled =
+                !canPublish;
 
             topicField.value =
                 post.topic ?? '';
@@ -1548,6 +1590,110 @@ function e(string $value): string
     );
 
     loadRecentPosts();
+
+    publishButton.addEventListener(
+        'click',
+        async () => {
+
+            if (
+                !draftId.value ||
+                publishButton.disabled
+            ) {
+                return;
+            }
+
+            const confirmed = window.confirm(
+                'Publish this post to the House Dainislaav Facebook Page?'
+            );
+
+            if (!confirmed) {
+                return;
+            }
+
+            const originalText =
+                publishButton.textContent;
+
+            try {
+                publishButton.disabled = true;
+                publishButton.textContent =
+                    'Publishing...';
+
+                document.body.classList.add(
+                    'is-busy'
+                );
+
+                draftStatus.classList.remove(
+                    'error'
+                );
+
+                draftStatus.textContent =
+                    'Publishing to Facebook...';
+
+                const formData =
+                    new FormData();
+
+                formData.set(
+                    'id',
+                    draftId.value
+                );
+
+                const response = await fetch(
+                    '/api/publish-post.php',
+                    {
+                        method: 'POST',
+                        body: formData,
+                        headers: {
+                            'Accept': 'application/json'
+                        }
+                    }
+                );
+
+                const data =
+                    await response.json();
+
+                if (
+                    !response.ok ||
+                    !data.success
+                ) {
+                    throw new Error(
+                        data.error ||
+                        'Unable to publish post.'
+                    );
+                }
+
+                draftStatus.textContent =
+                    data.message;
+
+                publishButton.hidden = true;
+                publishButton.disabled = true;
+
+                await loadRecentPosts();
+
+            } catch (error) {
+
+                console.error(error);
+
+                draftStatus.classList.add(
+                    'error'
+                );
+
+                draftStatus.textContent =
+                    error.message ||
+                    'Unable to publish post.';
+
+                publishButton.disabled = false;
+
+            } finally {
+
+                publishButton.textContent =
+                    originalText;
+
+                document.body.classList.remove(
+                    'is-busy'
+                );
+            }
+        }
+    );
 
 })();
 </script>
