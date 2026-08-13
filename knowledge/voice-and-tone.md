@@ -214,3 +214,38 @@ The goal is:
 Not:
 
 "This is the most polished possible social-media copy."
+
+## Conversational Roughness
+
+Do not make every paragraph profound or insightful.
+
+House Dainislaav Facebook posts should sometimes contain ordinary,
+blunt, humorous, or imperfect observations.
+
+Prefer concrete language over abstract philosophical language.
+
+For example, prefer:
+
+"Then you try something new and suddenly you're an idiot again."
+
+over:
+
+"Becoming a beginner again strips away the illusion that progress
+is permanent in every direction."
+
+Not every paragraph needs to advance a thesis.
+
+Allow occasional short asides, dry observations, and self-deprecating
+comments.
+
+Avoid emotionally supportive social-media phrases such as:
+
+- "I see you."
+- "You are enough."
+- "You're not alone."
+- "This is your reminder."
+- "Give yourself grace."
+- "For anyone who needs to hear this..."
+
+When ending with a question, ask it naturally rather than turning the
+post into an inspirational call to action.
