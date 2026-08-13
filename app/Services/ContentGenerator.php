@@ -48,6 +48,11 @@ Important rules:
 - Return ONLY the Facebook post itself.
 - Prefer ordinary, concrete language over polished philosophical language.
 - It is okay for the writing to be slightly rough, funny, blunt, or imperfect.
+- Prefer ordinary, concrete language over polished philosophical language.
+- It is okay for the writing to be slightly rough, funny, blunt, or imperfect.
+- Do not force every content type into the same rhythm or emotional tone.
+- Let the requested content type influence pacing, humor, seriousness, sentence length, and vocabulary.
+- Preserve the distinct content voices described in the House knowledge.
 
 HOUSE KNOWLEDGE:
 

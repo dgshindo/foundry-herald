@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use FoundryHerald\Config;
 use FoundryHerald\Database;
+use FoundryHerald\Services\KnowledgeLoader;
 
 define('APP_ROOT', dirname(__DIR__));
 
@@ -13,8 +14,6 @@ Config::load(APP_ROOT);
 
 $db = Database::connection();
 
-use FoundryHerald\Services\KnowledgeLoader;
-
 $knowledgeLoader = new KnowledgeLoader(
     APP_ROOT . '/knowledge'
 );
@@ -23,25 +22,41 @@ $heraldContext = $knowledgeLoader->buildContext([
     'house-dainislaav.md',
     'voice-and-tone.md',
     'content-rules.md',
+    'content-voices.md',
 ]);
 
-use FoundryHerald\Services\ContentGenerator;
+$postTypes = [
+    'auto' => 'Let Herald Decide',
+    'forge_reflection' => 'Forge Reflection',
+    'song_promotion' => 'Song Promotion',
+    'lyric_spotlight' => 'Lyric Spotlight',
+    'behind_the_music' => 'Behind the Music',
+    'mythic_adventures' => 'Mythic Adventures / LARP',
+    'creator_developer' => 'Creator / Developer',
+    'humor' => 'Humor / Meme',
+    'engagement' => 'Engagement Question',
+    'house_lore' => 'House / Iron Voice',
+];
 
-$generatedPost = null;
-$error = null;
+$imageOptions = [
+    'auto' => 'Auto',
+    'yes' => 'Yes',
+    'no' => 'No',
+];
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    try {
-        $generator = new ContentGenerator();
+$selectedPostType = $_POST['post_type'] ?? 'auto';
+$topic = trim($_POST['topic'] ?? '');
+$imagePreference = $_POST['image_preference'] ?? 'auto';
 
-        $generatedPost = $generator->generate(
-            $heraldContext,
-            'Forge Reflection',
-            'Starting over and becoming a beginner again'
-        );
-    } catch (Throwable $e) {
-        $error = $e->getMessage();
-    }
+
+
+function e(string $value): string
+{
+    return htmlspecialchars(
+        $value,
+        ENT_QUOTES,
+        'UTF-8'
+    );
 }
 
 ?>
@@ -49,71 +64,562 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
     <title>Foundry Herald</title>
 
     <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        :root {
+            color-scheme: dark;
+
+            --background: #0d0d0d;
+            --surface: #171717;
+            --surface-secondary: #1f1f1f;
+            --border: #343434;
+
+            --text: #f3f3f3;
+            --muted: #969292;
+
+            --accent: #b56a2d;
+            --accent-hover: #cf7c35;
+
+            --danger: #ff8b8b;
+        }
+
         body {
             margin: 0;
             min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #111;
-            color: #eee;
-            font-family: Arial, sans-serif;
+
+            background:
+                radial-gradient(
+                    circle at top,
+                    #1c1510 0,
+                    var(--background) 45%
+                );
+
+            color: var(--text);
+
+            font-family:
+                Arial,
+                Helvetica,
+                sans-serif;
         }
 
-        main {
+        .app {
+            width: min(960px, calc(100% - 32px));
+
+            margin: 0 auto;
+            padding: 48px 0 80px;
+        }
+
+        .app-header {
+            margin-bottom: 32px;
             text-align: center;
         }
 
-        h1 {
-            margin-bottom: .25rem;
-            font-size: 2.5rem;
+        .app-header h1 {
+            margin: 0 0 6px;
+
+            font-size: 2.3rem;
+            letter-spacing: .04em;
         }
 
-        p {
-            color: #999;
+        .app-header p {
+            margin: 0;
+            color: var(--muted);
+        }
+
+        .panel {
+            margin-bottom: 24px;
+            padding: 24px;
+
+            background: var(--surface);
+
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+
+        .panel h2 {
+            margin: 0 0 20px;
+
+            font-size: 1rem;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+        }
+
+        .form-grid {
+            display: grid;
+
+            grid-template-columns:
+                repeat(2, minmax(0, 1fr));
+
+            gap: 18px;
+        }
+
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+        }
+
+        .field-full {
+            grid-column: 1 / -1;
+        }
+
+        label {
+            font-size: .85rem;
+            font-weight: bold;
+            color: #d4d1d1;
+        }
+
+        select,
+        input,
+        textarea {
+            width: 100%;
+
+            padding: 11px 12px;
+
+            background: var(--surface-secondary);
+            color: var(--text);
+
+            border: 1px solid var(--border);
+            border-radius: 4px;
+
+            font: inherit;
+        }
+
+        select:focus,
+        input:focus,
+        textarea:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        textarea {
+            resize: vertical;
+        }
+
+        #topic {
+            min-height: 90px;
+        }
+
+        #post-draft {
+            min-height: 320px;
+
+            line-height: 1.55;
+        }
+
+        .form-actions {
+            display: flex;
+            justify-content: flex-end;
+
+            margin-top: 20px;
+        }
+
+        button {
+            padding: 11px 22px;
+
+            background: var(--accent);
+            color: #fff;
+
+            border: 0;
+            border-radius: 4px;
+
+            font-size: .9rem;
+            font-weight: bold;
+
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: var(--accent-hover);
+        }
+
+        .draft-meta {
+            display: flex;
+            flex-wrap: wrap;
+
+            gap: 8px;
+
+            margin-bottom: 14px;
+        }
+
+        .tag {
+            padding: 5px 8px;
+
+            background: var(--surface-secondary);
+            color: var(--muted);
+
+            border: 1px solid var(--border);
+            border-radius: 3px;
+
+            font-size: .75rem;
+        }
+
+        .error {
+            margin-bottom: 24px;
+            padding: 14px 16px;
+
+            color: var(--danger);
+            background: #251616;
+
+            border: 1px solid #5e2929;
+            border-radius: 5px;
+        }
+
+        .empty-state {
+            color: var(--muted);
+            line-height: 1.6;
+        }
+
+        .future-note {
+            margin-top: 12px;
+
+            color: var(--muted);
+            font-size: .8rem;
+        }
+
+        body.is-busy {
+            cursor: wait;
+        }
+
+        body.is-busy input,
+        body.is-busy textarea,
+        body.is-busy select {
+            cursor: wait;
+        }
+
+        button:disabled {
+            opacity: .55;
+            cursor: not-allowed;
+        }
+
+        .generation-status {
+            display: inline-block;
+            margin-left: 12px;
+
+            color: var(--muted);
+            font-size: .85rem;
+        }
+
+        .generation-status.error {
+            color: var(--danger);
+        }
+
+        #post-draft.is-generating {
+            opacity: .6;
+        }
+
+        @media (max-width: 700px) {
+            .app {
+                width: min(100% - 20px, 960px);
+                padding-top: 24px;
+            }
+
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .field-full {
+                grid-column: auto;
+            }
         }
     </style>
 </head>
 
 <body>
 
-<main>
-    <h1>Foundry Herald</h1>
-    <p>House Dainislaav Content Agent</p>
+<div class="app">
 
-    <form method="post">
-        <button type="submit">
-            Generate Test Post
-        </button>
-    </form>
+    <header class="app-header">
+        <h1>Foundry Herald</h1>
 
-    <?php if ($error): ?>
-        <div style="margin-top: 2rem; color: #ff8080;">
-            <?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?>
-        </div>
-    <?php endif; ?>
+        <p>
+            House Dainislaav Content Agent
+        </p>
+    </header>
 
-    <?php if ($generatedPost): ?>
-        <div style="
-            max-width: 700px;
-            margin: 2rem auto;
-            padding: 1.5rem;
-            text-align: left;
-            white-space: pre-wrap;
-            background: #1a1a1a;
-            border: 1px solid #333;
-        "><?= htmlspecialchars(
-            $generatedPost,
-            ENT_QUOTES,
-            'UTF-8'
-        ) ?></div>
-    <?php endif; ?>
-</main>
+
+
+    <section class="panel">
+
+        <h2>Create Content</h2>
+
+        <form id="content-form">
+
+            <div class="form-grid">
+
+                <div class="field">
+                    <label for="post_type">
+                        Post Type
+                    </label>
+
+                    <select
+                        id="post_type"
+                        name="post_type"
+                    >
+                        <?php foreach ($postTypes as $value => $label): ?>
+
+                            <option
+                                value="<?= e($value) ?>"
+                                <?= $selectedPostType === $value
+                                    ? 'selected'
+                                    : '' ?>
+                            >
+                                <?= e($label) ?>
+                            </option>
+
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <div class="field">
+                    <label for="image_preference">
+                        Image
+                    </label>
+
+                    <select
+                        id="image_preference"
+                        name="image_preference"
+                    >
+                        <?php foreach ($imageOptions as $value => $label): ?>
+
+                            <option
+                                value="<?= e($value) ?>"
+                                <?= $imagePreference === $value
+                                    ? 'selected'
+                                    : '' ?>
+                            >
+                                <?= e($label) ?>
+                            </option>
+
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <div class="field field-full">
+                    <label for="topic">
+                        Topic / Idea
+                    </label>
+
+                    <textarea
+                        id="topic"
+                        name="topic"
+                        placeholder="Optional. Leave blank and let Herald choose."
+                    ><?= e($topic) ?></textarea>
+                </div>
+
+            </div>
+
+            <div class="form-actions">
+                <button
+                    type="submit"
+                    id="generate-button"
+                >
+                    Generate Post
+                </button>
+                <span
+                    id="generation-status"
+                    class="generation-status"
+                    aria-live="polite"
+                ></span>
+            </div>
+
+        </form>
+
+    </section>
+
+    <section class="panel">
+
+    <h2>Draft</h2>
+
+    <div
+        id="draft-meta"
+        class="draft-meta"
+        hidden
+    ></div>
+
+    <textarea
+        id="post-draft"
+        name="post_draft"
+        placeholder="Your generated post will appear here..."
+    ></textarea>
+
+    <div
+        id="draft-note"
+        class="future-note"
+    >
+        Generated drafts are not saved yet.
+        Persistence comes in the next milestone.
+    </div>
+
+</section>
+
+</div>
+
+<script>
+(() => {
+
+    const form =
+        document.getElementById('content-form');
+
+    const generateButton =
+        document.getElementById('generate-button');
+
+    const status =
+        document.getElementById('generation-status');
+
+    const draft =
+        document.getElementById('post-draft');
+
+    const draftMeta =
+        document.getElementById('draft-meta');
+
+    if (
+        !form ||
+        !generateButton ||
+        !status ||
+        !draft
+    ) {
+        return;
+    }
+
+    let generating = false;
+
+    form.addEventListener('submit', async (event) => {
+
+        event.preventDefault();
+
+        if (generating) {
+            return;
+        }
+
+        generating = true;
+
+        const originalButtonText =
+            generateButton.textContent;
+
+        generateButton.disabled = true;
+        generateButton.textContent = 'Generating...';
+
+        document.body.classList.add('is-busy');
+        draft.classList.add('is-generating');
+
+        status.classList.remove('error');
+        status.textContent =
+            'Herald is preparing a draft...';
+
+        const formData = new FormData(form);
+
+        const postTypeSelect =
+            document.getElementById('post_type');
+
+        const selectedPostType =
+            postTypeSelect.options[
+                postTypeSelect.selectedIndex
+            ].text;
+
+        formData.set(
+            'post_type',
+            selectedPostType
+        );
+
+        try {
+
+            const response = await fetch(
+                '/api/generate-post.php',
+                {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                }
+            );
+
+            const data = await response.json();
+
+            if (!response.ok || !data.success) {
+
+                throw new Error(
+                    data.error ||
+                    'Herald was unable to generate a post.'
+                );
+            }
+
+            draft.value = data.post;
+
+            draftMeta.hidden = false;
+
+            draftMeta.innerHTML = '';
+
+            const typeTag =
+                document.createElement('span');
+
+            typeTag.className = 'tag';
+            typeTag.textContent = selectedPostType;
+
+            const imageTag =
+                document.createElement('span');
+
+            imageTag.className = 'tag';
+
+            imageTag.textContent =
+                'Image: ' +
+                (
+                    data.imagePreference
+                        ? data.imagePreference
+                            .charAt(0)
+                            .toUpperCase()
+                          + data.imagePreference.slice(1)
+                        : 'Auto'
+                );
+
+            draftMeta.appendChild(typeTag);
+            draftMeta.appendChild(imageTag);
+
+            status.textContent =
+                'Draft ready.';
+
+        } catch (error) {
+
+            console.error(error);
+
+            status.classList.add('error');
+
+            status.textContent =
+                error.message ||
+                'Something went wrong.';
+
+        } finally {
+
+            generating = false;
+
+            generateButton.disabled = false;
+
+            generateButton.textContent =
+                originalButtonText;
+
+            document.body.classList.remove(
+                'is-busy'
+            );
+
+            draft.classList.remove(
+                'is-generating'
+            );
+        }
+    });
+
+})();
+</script>
 
 </body>
 </html>
