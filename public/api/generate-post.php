@@ -6,6 +6,8 @@ use FoundryHerald\Config;
 use FoundryHerald\Database;
 use FoundryHerald\Services\ContentGenerator;
 use FoundryHerald\Services\KnowledgeLoader;
+use FoundryHerald\Repositories\PostRepository;
+use FoundryHerald\Services\ContentMemory;
 
 define('APP_ROOT', dirname(__DIR__, 2));
 
@@ -52,9 +54,10 @@ try {
 
     if ($topic === '') {
         $topic =
-            'Choose a relevant topic based on the House Dainislaav '
-            . 'knowledge and content rules.';
-    }
+        'Choose a fresh topic appropriate to the selected content type. '
+        . 'Do not reuse or closely paraphrase any recent central topic. '
+        . 'Prefer an idea that has not appeared in recent content.';
+        }
 
     $knowledgeLoader = new KnowledgeLoader(
         APP_ROOT . '/knowledge'
@@ -67,10 +70,19 @@ try {
         'content-voices.md',
     ]);
 
+    $postRepository = new PostRepository();
+
+    $contentMemory = new ContentMemory(
+        $postRepository
+    );
+
+    $memory = $contentMemory->build(12);
+
     $generator = new ContentGenerator();
 
     $post = $generator->generate(
         $context,
+        $memory,
         $postType,
         $topic
     );

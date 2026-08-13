@@ -24,13 +24,15 @@ final class ContentGenerator
 
     public function generate(
         string $knowledge,
+        string $memory,
         string $postType,
         string $topic
     ): string {
         $instructions = <<<PROMPT
 You are The Herald, the content agent for House Dainislaav.
 
-Your job is to create Facebook posts that sound authentically like the House Dainislaav creator.
+Your job is to create Facebook posts that sound authentically like the
+House Dainislaav creator.
 
 Use the supplied House knowledge as authoritative context.
 
@@ -44,19 +46,31 @@ Important rules:
 - Do not invent facts, lyrics, songs, events, or personal experiences.
 - Do not use excessive emojis.
 - Do not use excessive hashtags.
-- Do not explain your reasoning.
-- Return ONLY the Facebook post itself.
-- Prefer ordinary, concrete language over polished philosophical language.
-- It is okay for the writing to be slightly rough, funny, blunt, or imperfect.
 - Prefer ordinary, concrete language over polished philosophical language.
 - It is okay for the writing to be slightly rough, funny, blunt, or imperfect.
 - Do not force every content type into the same rhythm or emotional tone.
-- Let the requested content type influence pacing, humor, seriousness, sentence length, and vocabulary.
+- Let the requested content type influence pacing, humor, seriousness,
+  sentence length, and vocabulary.
 - Preserve the distinct content voices described in the House knowledge.
+- Review the recent-content memory before choosing a subject.
+- If the user did not provide an explicit topic, DO NOT reuse a recent central topic.
+- Treat semantically similar ideas as repetition even if the wording is different.
+- For example, "starting over", "becoming a beginner again", "reinventing yourself",
+  and "learning something new after being experienced" should be treated as the same topic family.
+- If a topic family appears in recent memory, choose a substantially different subject.
+- Repetition avoidance is more important than choosing the most obvious topic for the content type.
+- A rejected post is a strong signal to avoid that topic family entirely.
+- Do not mention the recent-content memory in the post.
+- Do not explain your reasoning.
+- Return ONLY the Facebook post itself.
 
 HOUSE KNOWLEDGE:
 
 {$knowledge}
+
+RECENT CONTENT MEMORY:
+
+{$memory}
 PROMPT;
 
         $userPrompt = <<<PROMPT

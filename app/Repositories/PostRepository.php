@@ -191,4 +191,43 @@ final class PostRepository
             ? $post
             : null;
     }
+
+    public function findRecentForMemory(int $limit = 12): array
+    {
+        $db = Database::connection();
+
+        $limit = max(1, min($limit, 30));
+
+        $statement = $db->prepare(
+            '
+            SELECT
+                id,
+                post_type,
+                topic,
+                content,
+                status,
+                created_at,
+                updated_at
+            FROM posts
+            WHERE status IN (
+                \'draft\',
+                \'approved\',
+                \'rejected\',
+                \'published\'
+            )
+            ORDER BY updated_at DESC, id DESC
+            LIMIT :limit
+            '
+        );
+
+        $statement->bindValue(
+            ':limit',
+            $limit,
+            \PDO::PARAM_INT
+        );
+
+        $statement->execute();
+
+        return $statement->fetchAll();
+    }
 }

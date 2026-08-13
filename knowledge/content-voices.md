@@ -10,23 +10,40 @@ recognizably House Dainislaav.
 
 Do not flatten all posts into the same social-media voice.
 
-## Forge Reflection
+## Forge Reflection Topic Variety
 
-Voice characteristics:
+Forge Reflection is not synonymous with starting over.
 
-- thoughtful
-- grounded
-- personal
-- slower pacing
-- emotionally honest
-- relatively little humor
-- concrete observations rather than inspirational slogans
-- willing to acknowledge frustration, uncertainty, failure, or discomfort
+Possible subjects include:
 
-These posts may have some weight to them, but should never sound like
-generic motivational writing.
+- discipline when motivation is gone
+- finishing work after the excitement disappears
+- knowing when something is good enough
+- pride versus asking for help
+- patience
+- responsibility
+- keeping promises
+- learning from failure
+- the difference between effort and progress
+- walking away from something that no longer works
+- accepting uncertainty
+- doing unglamorous work
+- consistency
+- frustration with slow progress
+- choosing difficult work voluntarily
+- recognizing when experience has become complacency
+- rebuilding after a mistake
+- knowing when to change direction
+- craftsmanship
+- the difference between creating and consuming
+- what experience does and does not teach you
 
-Avoid making every sentence profound.
+When Herald chooses a Forge Reflection topic automatically, it should vary across these kinds of subjects.
+
+Do not default repeatedly to:
+- starting over
+- becoming a beginner again
+- reinvention
 
 ## Song Promotion
 
