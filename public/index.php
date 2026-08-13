@@ -342,6 +342,138 @@ function e(string $value): string
             background: #7d3636;
         }
 
+        .panel-heading-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+
+            margin-bottom: 20px;
+        }
+
+        .panel-heading-row h2 {
+            margin: 0;
+        }
+
+        .compact-button {
+            padding: 7px 12px;
+            font-size: .78rem;
+        }
+
+        .recent-content {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .history-item {
+            display: grid;
+
+            grid-template-columns:
+                minmax(0, 1fr)
+                auto;
+
+            gap: 16px;
+
+            padding: 14px 16px;
+
+            background: var(--surface-secondary);
+
+            border: 1px solid var(--border);
+            border-radius: 5px;
+        }
+
+        .history-main {
+            min-width: 0;
+        }
+
+        .history-top {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+
+            margin-bottom: 5px;
+        }
+
+        .history-type {
+            font-weight: bold;
+            color: var(--text);
+        }
+
+        .history-topic {
+            margin-top: 5px;
+
+            color: #d4d1d1;
+            font-size: .9rem;
+        }
+
+        .history-preview {
+            margin-top: 8px;
+
+            color: var(--muted);
+            font-size: .85rem;
+            line-height: 1.45;
+        }
+
+        .history-date {
+            margin-top: 7px;
+
+            color: #777;
+            font-size: .75rem;
+        }
+
+        .history-actions {
+            display: flex;
+            align-items: center;
+        }
+
+        .status-badge {
+            padding: 4px 7px;
+
+            border-radius: 3px;
+
+            font-size: .7rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: .05em;
+        }
+
+        .status-draft {
+            background: #39330f;
+            color: #e0c765;
+        }
+
+        .status-approved {
+            background: #173a22;
+            color: #75cf91;
+        }
+
+        .status-rejected {
+            background: #462020;
+            color: #dc8585;
+        }
+
+        .status-published {
+            background: #163348;
+            color: #80bfe3;
+        }
+
+        .status-failed {
+            background: #462020;
+            color: #dc8585;
+        }
+
+        @media (max-width: 700px) {
+            .history-item {
+                grid-template-columns: 1fr;
+            }
+
+            .history-actions {
+                justify-content: flex-start;
+            }
+        }
+
         @media (max-width: 700px) {
             .app {
                 width: min(100% - 20px, 960px);
@@ -515,6 +647,31 @@ function e(string $value): string
 
 </section>
 
+<section class="panel">
+
+    <div class="panel-heading-row">
+        <h2>Recent Content</h2>
+
+        <button
+            type="button"
+            id="refresh-history-button"
+            class="secondary-button compact-button"
+        >
+            Refresh
+        </button>
+    </div>
+
+    <div
+        id="recent-content"
+        class="recent-content"
+    >
+        <div class="empty-state">
+            Loading recent posts...
+        </div>
+    </div>
+
+</section>
+
 </div>
 
 <script>
@@ -550,12 +707,59 @@ function e(string $value): string
     const rejectButton =
         document.getElementById('reject-button');
 
+    const recentContent =
+        document.getElementById('recent-content');
+
+    const refreshHistoryButton =
+        document.getElementById(
+            'refresh-history-button'
+        );
+
+    const postTypeLabels = {
+        auto: 'Let Herald Decide',
+        forge_reflection: 'Forge Reflection',
+        song_promotion: 'Song Promotion',
+        lyric_spotlight: 'Lyric Spotlight',
+        behind_the_music: 'Behind the Music',
+        mythic_adventures: 'Mythic Adventures / LARP',
+        creator_developer: 'Creator / Developer',
+        humor: 'Humor / Meme',
+        engagement: 'Engagement Question',
+        house_lore: 'House / Iron Voice'
+    };
+
     if (
         !form ||
         !generateButton ||
         !status ||
-        !draft
+        !draft ||
+        !draftMeta ||
+        !saveDraftButton ||
+        !draftStatus ||
+        !draftId ||
+        !approveButton ||
+        !rejectButton ||
+        !recentContent ||
+        !refreshHistoryButton
     ) {
+        console.error(
+            'Foundry Herald UI initialization failed.',
+            {
+                form,
+                generateButton,
+                status,
+                draft,
+                draftMeta,
+                saveDraftButton,
+                draftStatus,
+                draftId,
+                approveButton,
+                rejectButton,
+                recentContent,
+                refreshHistoryButton
+            }
+        );
+
         return;
     }
 
@@ -626,7 +830,6 @@ function e(string $value): string
 
             draftId.value = '';
 
-            saveDraftButton.disabled = false;
             saveDraftButton.disabled = false;
             approveButton.disabled = false;
             rejectButton.disabled = false;
@@ -767,6 +970,64 @@ function e(string $value): string
         return data;
     }
 
+
+    saveDraftButton.addEventListener(
+        'click',
+        async () => {
+
+            if (
+                !draft.value.trim() ||
+                saveDraftButton.disabled
+            ) {
+                return;
+            }
+
+            const originalText =
+                saveDraftButton.textContent;
+
+            try {
+                saveDraftButton.disabled = true;
+                approveButton.disabled = true;
+                rejectButton.disabled = true;
+
+                saveDraftButton.textContent = 'Saving...';
+
+                document.body.classList.add('is-busy');
+
+                draftStatus.classList.remove('error');
+                draftStatus.textContent = 'Saving draft...';
+
+                await saveCurrentDraft();
+
+                draftStatus.textContent = 'Draft saved.';
+
+                await loadRecentPosts();
+
+            } catch (error) {
+
+                console.error(error);
+
+                draftStatus.classList.add('error');
+                draftStatus.textContent =
+                    error.message ||
+                    'Unable to save draft.';
+
+            } finally {
+
+                saveDraftButton.textContent =
+                    originalText;
+
+                saveDraftButton.disabled = false;
+                approveButton.disabled = false;
+                rejectButton.disabled = false;
+
+                document.body.classList.remove(
+                    'is-busy'
+                );
+            }
+        }
+    );
+
     async function changePostStatus(status) {
 
         if (!draft.value.trim()) {
@@ -883,6 +1144,7 @@ function e(string $value): string
                 'is-busy'
             );
         }
+        await loadRecentPosts();
     }
 
     approveButton.addEventListener(
@@ -912,6 +1174,380 @@ function e(string $value): string
                 'Unsaved changes.';
         }
     });
+
+    function escapeHtml(value) {
+
+        return String(value ?? '')
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#039;');
+    }
+
+    function postPreview(content, length = 180) {
+
+        const text =
+            String(content ?? '')
+                .replace(/\s+/g, ' ')
+                .trim();
+
+        if (text.length <= length) {
+            return text;
+        }
+
+        return text.slice(0, length).trim() + '...';
+    }
+
+    async function loadRecentPosts() {
+
+        if (!recentContent) {
+            return;
+        }
+
+        recentContent.innerHTML =
+            '<div class="empty-state">'
+            + 'Loading recent posts...'
+            + '</div>';
+
+        try {
+
+            const response = await fetch(
+                '/api/recent-posts.php?limit=20',
+                {
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                }
+            );
+
+            const data = await response.json();
+
+            if (!response.ok || !data.success) {
+                throw new Error(
+                    data.error ||
+                    'Unable to load recent posts.'
+                );
+            }
+
+            renderRecentPosts(data.posts);
+
+        } catch (error) {
+
+            console.error(error);
+
+            recentContent.innerHTML =
+                '<div class="error">'
+                + escapeHtml(
+                    error.message ||
+                    'Unable to load recent posts.'
+                )
+                + '</div>';
+        }
+    }
+
+    function renderRecentPosts(posts) {
+
+        if (!posts || posts.length === 0) {
+
+            recentContent.innerHTML =
+                '<div class="empty-state">'
+                + 'No saved content yet.'
+                + '</div>';
+
+            return;
+        }
+
+        recentContent.innerHTML =
+            posts.map((post) => {
+
+                const status =
+                    String(post.status || 'draft');
+
+                const actionLabel =
+                    status === 'draft'
+                        ? 'Open'
+                        : 'View';
+
+                const topic =
+                    post.topic
+                        ? escapeHtml(post.topic)
+                        : 'No topic provided';
+
+                const preview =
+                    escapeHtml(
+                        postPreview(post.content)
+                    );
+
+                const date =
+                    post.updated_at
+                        ? new Date(
+                            post.updated_at.replace(' ', 'T')
+                        ).toLocaleString()
+                        : '';
+
+                return `
+                    <article class="history-item">
+
+                        <div class="history-main">
+
+                            <div class="history-top">
+
+                                <span class="history-type">
+                                    ${escapeHtml(postTypeLabels[post.post_type] || post.post_type)}
+                                </span>
+
+                                <span
+                                    class="
+                                        status-badge
+                                        status-${escapeHtml(status)}
+                                    "
+                                >
+                                    ${escapeHtml(status)}
+                                </span>
+
+                            </div>
+
+                            <div class="history-topic">
+                                ${topic}
+                            </div>
+
+                            <div class="history-preview">
+                                ${preview}
+                            </div>
+
+                            <div class="history-date">
+                                ${escapeHtml(date)}
+                            </div>
+
+                        </div>
+
+                        <div class="history-actions">
+
+                            <button
+                                type="button"
+                                class="
+                                    secondary-button
+                                    compact-button
+                                    open-post-button
+                                "
+                                data-post-id="${Number(post.id)}"
+                            >
+                                ${actionLabel}
+                            </button>
+
+                        </div>
+
+                    </article>
+                `;
+
+            }).join('');
+    }
+
+    recentContent.addEventListener(
+        'click',
+        async (event) => {
+
+            const button =
+                event.target.closest(
+                    '.open-post-button'
+                );
+
+            if (!button) {
+                return;
+            }
+
+            const id =
+                Number(button.dataset.postId);
+
+            if (!id) {
+                return;
+            }
+
+            await loadPost(id);
+        }
+    );
+
+    async function loadPost(id) {
+
+        try {
+
+            document.body.classList.add('is-busy');
+
+            const response = await fetch(
+                '/api/get-post.php?id='
+                + encodeURIComponent(id),
+                {
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                }
+            );
+
+            const data = await response.json();
+
+            if (!response.ok || !data.success) {
+                throw new Error(
+                    data.error ||
+                    'Unable to load post.'
+                );
+            }
+
+            const post = data.post;
+
+            draftId.value = post.id;
+            draft.value = post.content ?? '';
+
+            const topicField =
+                document.getElementById('topic');
+
+            const postTypeSelect =
+                document.getElementById('post_type');
+
+            const imagePreferenceSelect =
+                document.getElementById(
+                    'image_preference'
+                );
+
+            topicField.value =
+                post.topic ?? '';
+
+            imagePreferenceSelect.value =
+                post.image_preference ?? 'auto';
+
+            /*
+            * Our database stores the option VALUE,
+            * so restore it directly when possible.
+            */
+            if (
+                postTypeSelect.querySelector(
+                    `option[value="${CSS.escape(
+                        post.post_type
+                    )}"]`
+                )
+            ) {
+                postTypeSelect.value =
+                    post.post_type;
+            }
+
+            const isDraft =
+                post.status === 'draft';
+
+            draft.readOnly = !isDraft;
+
+            saveDraftButton.disabled = !isDraft;
+            approveButton.disabled = !isDraft;
+            rejectButton.disabled = !isDraft;
+
+            draftStatus.classList.remove('error');
+
+            if (isDraft) {
+                draftStatus.textContent =
+                    'Draft loaded.';
+            } else {
+                draftStatus.textContent =
+                    post.status
+                        .charAt(0)
+                        .toUpperCase()
+                    + post.status.slice(1)
+                    + ' post.';
+            }
+
+            /*
+            * Rebuild the metadata chips.
+            */
+            draftMeta.hidden = false;
+            draftMeta.innerHTML = '';
+
+            const typeTag =
+                document.createElement('span');
+
+            typeTag.className = 'tag';
+
+            typeTag.textContent =
+                postTypeLabels[post.post_type]
+                || post.post_type;
+
+            const imageTag =
+                document.createElement('span');
+
+            imageTag.className = 'tag';
+
+            imageTag.textContent =
+                'Image: '
+                + (
+                    post.image_preference
+                        ? post.image_preference
+                            .charAt(0)
+                            .toUpperCase()
+                        + post.image_preference.slice(1)
+                        : 'Auto'
+                );
+
+            const statusTag =
+                document.createElement('span');
+
+            statusTag.className = 'tag';
+
+            statusTag.textContent =
+                'Status: '
+                + post.status
+                    .charAt(0)
+                    .toUpperCase()
+                + post.status.slice(1);
+
+            draftMeta.appendChild(typeTag);
+            draftMeta.appendChild(imageTag);
+            draftMeta.appendChild(statusTag);
+
+            /*
+            * Bring the loaded post into view.
+            */
+            draft.scrollIntoView({
+                behavior: 'smooth',
+                block: 'center'
+            });
+
+        } catch (error) {
+
+            console.error(error);
+
+            draftStatus.classList.add('error');
+
+            draftStatus.textContent =
+                error.message ||
+                'Unable to load post.';
+
+        } finally {
+
+            document.body.classList.remove(
+                'is-busy'
+            );
+        }
+    }
+
+    refreshHistoryButton.addEventListener(
+        'click',
+        async () => {
+
+            const originalText =
+                refreshHistoryButton.textContent;
+
+            refreshHistoryButton.disabled = true;
+            refreshHistoryButton.textContent =
+                'Refreshing...';
+
+            try {
+                await loadRecentPosts();
+            } finally {
+                refreshHistoryButton.disabled = false;
+                refreshHistoryButton.textContent =
+                    originalText;
+            }
+        }
+    );
+
+    loadRecentPosts();
 
 })();
 </script>

@@ -121,4 +121,74 @@ final class PostRepository
             );
         }
     }
+
+    public function findRecent(int $limit = 20): array
+    {
+        $db = Database::connection();
+
+        $limit = max(1, min($limit, 100));
+
+        $statement = $db->prepare(
+            '
+            SELECT
+                id,
+                post_type,
+                topic,
+                image_preference,
+                content,
+                status,
+                created_at,
+                updated_at,
+                approved_at,
+                published_at
+            FROM posts
+            ORDER BY updated_at DESC, id DESC
+            LIMIT :limit
+            '
+        );
+
+        $statement->bindValue(
+            ':limit',
+            $limit,
+            \PDO::PARAM_INT
+        );
+
+        $statement->execute();
+
+        return $statement->fetchAll();
+    }
+
+    public function findById(int $id): ?array
+    {
+        $db = Database::connection();
+
+        $statement = $db->prepare(
+            '
+            SELECT
+                id,
+                post_type,
+                topic,
+                image_preference,
+                content,
+                status,
+                created_at,
+                updated_at,
+                approved_at,
+                published_at
+            FROM posts
+            WHERE id = :id
+            LIMIT 1
+            '
+        );
+
+        $statement->execute([
+            'id' => $id,
+        ]);
+
+        $post = $statement->fetch();
+
+        return $post !== false
+            ? $post
+            : null;
+    }
 }
