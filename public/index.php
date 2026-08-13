@@ -13,6 +13,18 @@ Config::load(APP_ROOT);
 
 $db = Database::connection();
 
+use FoundryHerald\Services\KnowledgeLoader;
+
+$knowledgeLoader = new KnowledgeLoader(
+    APP_ROOT . '/knowledge'
+);
+
+$heraldContext = $knowledgeLoader->buildContext([
+    'house-dainislaav.md',
+    'voice-and-tone.md',
+    'content-rules.md',
+]);
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
