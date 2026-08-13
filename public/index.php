@@ -334,6 +334,14 @@ function e(string $value): string
             background: #484848;
         }
 
+        .danger-button {
+            background: #632b2b;
+        }
+
+        .danger-button:hover:not(:disabled) {
+            background: #7d3636;
+        }
+
         @media (max-width: 700px) {
             .app {
                 width: min(100% - 20px, 960px);
@@ -454,7 +462,11 @@ function e(string $value): string
     </section>
 
     <section class="panel">
-
+        <input
+            type="hidden"
+            id="draft-id"
+            value=""
+        >
     <h2>Draft</h2>
 
     <div
@@ -473,6 +485,15 @@ function e(string $value): string
 
         <button
             type="button"
+            id="reject-button"
+            class="danger-button"
+            disabled
+        >
+            Reject
+        </button>
+
+        <button
+            type="button"
             id="save-draft-button"
             class="secondary-button"
             disabled
@@ -480,13 +501,15 @@ function e(string $value): string
             Save Draft
         </button>
 
-        <span
-            id="draft-status"
-            class="generation-status"
-            aria-live="polite"
-        ></span>
-        
-        <input type="hidden" id="draft-id" value="">
+        <button
+            type="button"
+            id="approve-button"
+            disabled
+        >
+            Approve
+        </button>
+
+        <span id="draft-status" class="generation-status" aria-live="polite"></span>
 
     </div>
 
@@ -520,6 +543,12 @@ function e(string $value): string
 
     const draftId =
         document.getElementById('draft-id');
+
+    const approveButton =
+        document.getElementById('approve-button');
+
+    const rejectButton =
+        document.getElementById('reject-button');
 
     if (
         !form ||
@@ -598,6 +627,11 @@ function e(string $value): string
             draftId.value = '';
 
             saveDraftButton.disabled = false;
+            saveDraftButton.disabled = false;
+            approveButton.disabled = false;
+            rejectButton.disabled = false;
+
+            draft.readOnly = false;
 
             draftStatus.classList.remove('error');
 
@@ -665,39 +699,117 @@ function e(string $value): string
         }
     });
 
-    saveDraftButton.addEventListener(
-        'click',
-        async () => {
+    async function saveCurrentDraft() {
 
-            if (
-                !draft.value.trim() ||
-                saveDraftButton.disabled
-            ) {
-                return;
+        if (!draft.value.trim()) {
+            throw new Error(
+                'Draft content cannot be empty.'
+            );
+        }
+
+        const postTypeSelect =
+            document.getElementById('post_type');
+
+        const imagePreferenceSelect =
+            document.getElementById(
+                'image_preference'
+            );
+
+        const topicField =
+            document.getElementById('topic');
+
+        const formData = new FormData();
+
+        formData.set('id', draftId.value);
+
+        formData.set(
+            'post_type',
+            postTypeSelect.value
+        );
+
+        formData.set(
+            'topic',
+            topicField.value
+        );
+
+        formData.set(
+            'image_preference',
+            imagePreferenceSelect.value
+        );
+
+        formData.set(
+            'content',
+            draft.value
+        );
+
+        const response = await fetch(
+            '/api/save-draft.php',
+            {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'Accept': 'application/json'
+                }
             }
+        );
 
-            const originalText =
-                saveDraftButton.textContent;
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+            throw new Error(
+                data.error ||
+                'Unable to save draft.'
+            );
+        }
+
+        draftId.value = data.id;
+
+        return data;
+    }
+
+    async function changePostStatus(status) {
+
+        if (!draft.value.trim()) {
+            return;
+        }
+
+        const actionButton =
+            status === 'approved'
+                ? approveButton
+                : rejectButton;
+
+        const originalText =
+            actionButton.textContent;
+
+        try {
 
             saveDraftButton.disabled = true;
-            saveDraftButton.textContent = 'Saving...';
+            approveButton.disabled = true;
+            rejectButton.disabled = true;
+
+            actionButton.textContent =
+                status === 'approved'
+                    ? 'Approving...'
+                    : 'Rejecting...';
 
             document.body.classList.add('is-busy');
 
             draftStatus.classList.remove('error');
+
             draftStatus.textContent =
-                'Saving draft...';
+                'Saving current version...';
 
-            const postTypeSelect =
-                document.getElementById('post_type');
+            /*
+            * Always save first.
+            * This guarantees we're approving/rejecting
+            * exactly what's currently in the textarea.
+            */
+            await saveCurrentDraft();
 
-            const imagePreferenceSelect =
-                document.getElementById(
-                    'image_preference'
-                );
-
-            const topicField =
-                document.getElementById('topic');
+            draftStatus.textContent =
+                status === 'approved'
+                    ? 'Approving post...'
+                    : 'Rejecting post...';
 
             const formData = new FormData();
 
@@ -707,77 +819,80 @@ function e(string $value): string
             );
 
             formData.set(
-                'post_type',
-                postTypeSelect.value
+                'status',
+                status
             );
 
-            formData.set(
-                'topic',
-                topicField.value
-            );
-
-            formData.set(
-                'image_preference',
-                imagePreferenceSelect.value
-            );
-
-            formData.set(
-                'content',
-                draft.value
-            );
-
-            try {
-
-                const response = await fetch(
-                    '/api/save-draft.php',
-                    {
-                        method: 'POST',
-                        body: formData,
-                        headers: {
-                            'Accept': 'application/json'
-                        }
+            const response = await fetch(
+                '/api/set-post-status.php',
+                {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'Accept': 'application/json'
                     }
-                );
-
-                const data = await response.json();
-
-                if (
-                    !response.ok ||
-                    !data.success
-                ) {
-                    throw new Error(
-                        data.error ||
-                        'Unable to save draft.'
-                    );
                 }
+            );
 
-                draftId.value = data.id;
+            const data = await response.json();
 
-                draftStatus.textContent =
-                    'Draft saved.';
-
-            } catch (error) {
-
-                console.error(error);
-
-                draftStatus.classList.add('error');
-
-                draftStatus.textContent =
-                    error.message ||
-                    'Unable to save draft.';
-
-            } finally {
-
-                saveDraftButton.disabled = false;
-
-                saveDraftButton.textContent =
-                    originalText;
-
-                document.body.classList.remove(
-                    'is-busy'
+            if (!response.ok || !data.success) {
+                throw new Error(
+                    data.error ||
+                    'Unable to update post status.'
                 );
             }
+
+            draft.readOnly = true;
+
+            draftStatus.textContent =
+                data.message;
+
+            /*
+            * Keep all actions disabled after
+            * approval/rejection.
+            */
+            saveDraftButton.disabled = true;
+            approveButton.disabled = true;
+            rejectButton.disabled = true;
+
+        } catch (error) {
+
+            console.error(error);
+
+            draftStatus.classList.add('error');
+
+            draftStatus.textContent =
+                error.message ||
+                'Something went wrong.';
+
+            /*
+            * Since the operation failed, allow
+            * the user to try again.
+            */
+            saveDraftButton.disabled = false;
+            approveButton.disabled = false;
+            rejectButton.disabled = false;
+
+        } finally {
+
+            actionButton.textContent =
+                originalText;
+
+            document.body.classList.remove(
+                'is-busy'
+            );
         }
+    }
+
+    approveButton.addEventListener(
+        'click',
+        () => changePostStatus('approved')
+    );
+
+    rejectButton.addEventListener(
+        'click',
+        () => changePostStatus('rejected')
     );
 
     draft.addEventListener('input', () => {

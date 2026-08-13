@@ -71,4 +71,54 @@ final class PostRepository
 
         return (int) $db->lastInsertId();
     }
+
+    public function setStatus(
+        int $id,
+        string $status
+    ): void {
+        $db = Database::connection();
+
+        if (!in_array(
+            $status,
+            ['draft', 'approved', 'rejected'],
+            true
+        )) {
+            throw new \InvalidArgumentException(
+                'Invalid post status.'
+            );
+        }
+
+        if ($status === 'approved') {
+            $statement = $db->prepare(
+                '
+                UPDATE posts
+                SET
+                    status = :status,
+                    approved_at = CURRENT_TIMESTAMP
+                WHERE id = :id
+                '
+            );
+        } else {
+            $statement = $db->prepare(
+                '
+                UPDATE posts
+                SET
+                    status = :status,
+                    approved_at = NULL
+                WHERE id = :id
+                '
+            );
+        }
+
+        $statement->execute([
+            'id' => $id,
+            'status' => $status,
+        ]);
+
+        if ($statement->rowCount() === 0) {
+            throw new \RuntimeException(
+                'Post could not be updated.'
+            );
+        }
+    }
 }
