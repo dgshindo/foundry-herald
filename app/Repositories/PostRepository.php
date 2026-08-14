@@ -11,6 +11,7 @@ final class PostRepository
 {
     public function saveDraft(
         ?int $id,
+        int $destinationId,
         string $postType,
         ?string $topic,
         string $imagePreference,
@@ -23,6 +24,7 @@ final class PostRepository
                 '
                 UPDATE posts
                 SET
+                    publishing_destination_id = :publishing_destination_id,
                     post_type = :post_type,
                     topic = :topic,
                     image_preference = :image_preference,
@@ -34,6 +36,7 @@ final class PostRepository
 
             $statement->execute([
                 'id' => $id,
+                'publishing_destination_id' => $destinationId,
                 'post_type' => $postType,
                 'topic' => $topic !== '' ? $topic : null,
                 'image_preference' => $imagePreference,
@@ -46,6 +49,7 @@ final class PostRepository
         $statement = $db->prepare(
             '
             INSERT INTO posts (
+                publishing_destination_id,
                 post_type,
                 topic,
                 image_preference,
@@ -53,6 +57,7 @@ final class PostRepository
                 status
             )
             VALUES (
+                :publishing_destination_id,
                 :post_type,
                 :topic,
                 :image_preference,
@@ -63,6 +68,7 @@ final class PostRepository
         );
 
         $statement->execute([
+            'publishing_destination_id' => $destinationId,
             'post_type' => $postType,
             'topic' => $topic !== '' ? $topic : null,
             'image_preference' => $imagePreference,
@@ -132,6 +138,7 @@ final class PostRepository
             '
             SELECT
                 id,
+                publishing_destination_id,
                 post_type,
                 topic,
                 image_preference,
@@ -140,7 +147,9 @@ final class PostRepository
                 created_at,
                 updated_at,
                 approved_at,
-                published_at
+                published_at,
+                facebook_post_id,
+                publish_error
             FROM posts
             ORDER BY updated_at DESC, id DESC
             LIMIT :limit
@@ -166,6 +175,7 @@ final class PostRepository
             '
             SELECT
                 id,
+                publishing_destination_id,
                 post_type,
                 topic,
                 image_preference,
@@ -174,7 +184,9 @@ final class PostRepository
                 created_at,
                 updated_at,
                 approved_at,
-                published_at
+                published_at,
+                facebook_post_id,
+                publish_error
             FROM posts
             WHERE id = :id
             LIMIT 1
@@ -192,7 +204,10 @@ final class PostRepository
             : null;
     }
 
-    public function findRecentForMemory(int $limit = 12): array
+    public function findRecentForMemory(
+        int $destinationId,
+        int $limit = 12
+    ): array
     {
         $db = Database::connection();
 
@@ -209,7 +224,8 @@ final class PostRepository
                 created_at,
                 updated_at
             FROM posts
-            WHERE status IN (
+            WHERE publishing_destination_id = :destination_id
+            AND status IN (
                 \'draft\',
                 \'approved\',
                 \'rejected\',
@@ -218,6 +234,12 @@ final class PostRepository
             ORDER BY updated_at DESC, id DESC
             LIMIT :limit
             '
+        );
+
+        $statement->bindValue(
+            ':destination_id',
+            $destinationId,
+            \PDO::PARAM_INT
         );
 
         $statement->bindValue(
@@ -246,7 +268,7 @@ final class PostRepository
                 facebook_post_id = :facebook_post_id,
                 publish_error = NULL
             WHERE id = :id
-            AND status = \'approved\'
+            AND status = \'publishing\'
             '
         );
 
@@ -257,7 +279,7 @@ final class PostRepository
 
         if ($statement->rowCount() === 0) {
             throw new \RuntimeException(
-                'Only approved posts can be published.'
+                'Published post could not be finalized from the publishing state.'
             );
         }
     }

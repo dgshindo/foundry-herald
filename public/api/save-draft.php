@@ -41,6 +41,16 @@ try {
             ? (int) $idRaw
             : null;
 
+    $destinationId = (int) (
+        $_POST['destination_id'] ?? 0
+    );
+
+    if ($destinationId <= 0) {
+        throw new RuntimeException(
+            'Please select a brand/page.'
+        );
+    }
+
     $postType = trim(
         (string) ($_POST['post_type'] ?? '')
     );
@@ -85,6 +95,7 @@ try {
 
     $savedId = $repository->saveDraft(
         $id,
+        $destinationId,
         $postType,
         $topic,
         $imagePreference,

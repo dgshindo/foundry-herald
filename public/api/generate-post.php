@@ -8,6 +8,7 @@ use FoundryHerald\Services\ContentGenerator;
 use FoundryHerald\Services\KnowledgeLoader;
 use FoundryHerald\Repositories\PostRepository;
 use FoundryHerald\Services\ContentMemory;
+use FoundryHerald\Repositories\PublishingDestinationRepository;
 
 define('APP_ROOT', dirname(__DIR__, 2));
 
@@ -52,6 +53,30 @@ try {
         (string) ($_POST['image_preference'] ?? 'auto')
     );
 
+    $destinationId = (int) (
+        $_POST['destination_id'] ?? 0
+    );
+
+    if ($destinationId <= 0) {
+        throw new RuntimeException(
+            'Please select a brand/page.'
+        );
+    }
+
+    $destinationRepository =
+        new PublishingDestinationRepository();
+
+    $destination =
+        $destinationRepository->findById(
+            $destinationId
+        );
+
+    if ($destination === null) {
+        throw new RuntimeException(
+            'The selected brand/page is not available.'
+        );
+    }
+
     if ($topic === '') {
         $topic =
         'Choose a fresh topic appropriate to the selected content type. '
@@ -59,8 +84,20 @@ try {
         . 'Prefer an idea that has not appeared in recent content.';
         }
 
+    $knowledgePath = trim(
+        (string) ($destination['knowledge_path'] ?? '')
+    );
+
+    if ($knowledgePath === '') {
+        throw new RuntimeException(
+            'No knowledge path is configured for '
+            . $destination['name']
+            . '.'
+        );
+    }
+
     $knowledgeLoader = new KnowledgeLoader(
-        APP_ROOT . '/knowledge'
+        APP_ROOT . '/' . trim($knowledgePath, '/\\')
     );
 
     $context = $knowledgeLoader->buildContext([
@@ -76,7 +113,12 @@ try {
         $postRepository
     );
 
-    $memory = $contentMemory->build(12);
+    $memory = $contentMemory->build(
+        $destinationId,
+        (string) $destination['name'],
+        12
+    );
+
 
     $generator = new ContentGenerator();
 

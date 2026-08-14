@@ -13,16 +13,26 @@ final class ContentMemory
     ) {
     }
 
-    public function build(int $limit = 12): string
+    public function build(
+        int $destinationId,
+        string $destinationName,
+        int $limit = 12
+    ): string
     {
-        $posts = $this->posts->findRecentForMemory($limit);
+        $posts = $this->posts->findRecentForMemory(
+            $destinationId,
+            $limit
+        );
 
         if ($posts === []) {
-            return 'No recent House Dainislaav posts exist yet.';
+            return sprintf(
+                'No recent %s posts exist yet.',
+                $destinationName
+            );
         }
 
         $memory = [
-            'RECENT HOUSE DAINISLAAV CONTENT',
+            'RECENT ' . strtoupper($destinationName) . ' CONTENT',
             '',
             'Use this only to avoid unnecessary repetition.',
             'Do not copy wording from these posts.',

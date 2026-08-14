@@ -76,11 +76,37 @@ try {
     $repository->claimForPublishing($postId);
     $claimed = true;
 
+    $destinationId = (int) (
+        $post['publishing_destination_id'] ?? 0
+    );
+
+    if ($destinationId <= 0) {
+        throw new RuntimeException(
+            'This post does not have a publishing destination.'
+        );
+    }
+
+    $destinationRepository =
+        new PublishingDestinationRepository();
+
+    $destination =
+        $destinationRepository->findById(
+            $destinationId
+        );
+
+    if ($destination === null) {
+        throw new RuntimeException(
+            'The publishing destination could not be found.'
+        );
+    }
+
     $publisher = new FacebookPublisher();
 
-    $facebookPostId = $publisher->publishText(
-        (string) $post['content']
-    );
+    $facebookPostId =
+        $publisher->publishText(
+            $destination,
+            (string) $post['content']
+        );
 
     $repository->markPublished(
         $postId,
@@ -93,7 +119,7 @@ try {
         'success' => true,
         'id' => $postId,
         'facebook_post_id' => $facebookPostId,
-        'message' => 'Published to House Dainislaav.',
+        'message' => 'Published to ' . ($destination['name'] ?? 'Facebook') . '.',
     ]);
 
 } catch (Throwable $e) {

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use FoundryHerald\Config;
 use FoundryHerald\Database;
-use FoundryHerald\Services\KnowledgeLoader;
 
 define('APP_ROOT', dirname(__DIR__));
 
@@ -14,16 +13,7 @@ Config::load(APP_ROOT);
 
 $db = Database::connection();
 
-$knowledgeLoader = new KnowledgeLoader(
-    APP_ROOT . '/knowledge'
-);
 
-$heraldContext = $knowledgeLoader->buildContext([
-    'house-dainislaav.md',
-    'voice-and-tone.md',
-    'content-rules.md',
-    'content-voices.md',
-]);
 
 $postTypes = [
     'auto' => 'Let Herald Decide',
@@ -579,6 +569,22 @@ function e(string $value): string
 
             <div class="form-grid">
 
+                <div class="form-group">
+                    <label for="destination">
+                        Brand / Page
+                    </label>
+
+                    <select
+                        id="destination"
+                        name="destination_id"
+                        required
+                    >
+                        <option value="">
+                            Loading brands...
+                        </option>
+                    </select>
+                </div>
+
                 <div class="field">
                     <label for="post_type">
                         Post Type
@@ -858,6 +864,9 @@ function e(string $value): string
         document.getElementById(
             'confirm-publish-button'
         );
+
+    const destinationSelect =
+        document.getElementById('destination');
     
     const postTypeLabels = {
         auto: 'Let Herald Decide',
@@ -1049,6 +1058,62 @@ function e(string $value): string
         }
     });
 
+    async function loadPublishingDestinations()
+    {
+        const response = await fetch(
+            '/api/publishing-destinations.php',
+            {
+                headers: {
+                    'Accept': 'application/json'
+                }
+            }
+        );
+
+        const data = await response.json();
+
+        if (
+            !response.ok ||
+            !data.success
+        ) {
+            throw new Error(
+                data.error ||
+                'Unable to load publishing destinations.'
+            );
+        }
+
+        destinationSelect.innerHTML = '';
+
+        for (const destination of data.destinations) {
+            const option =
+                document.createElement('option');
+
+            option.value =
+                destination.id;
+
+            option.textContent =
+                destination.name;
+
+            if (destination.is_default) {
+                option.selected = true;
+            }
+
+            destinationSelect.appendChild(option);
+        }
+
+        if (data.destinations.length === 0) {
+            const option =
+                document.createElement('option');
+
+            option.value = '';
+            option.textContent =
+                'No publishing destinations configured';
+
+            destinationSelect.appendChild(option);
+
+            generateButton.disabled = true;
+        }
+    }
+
     async function saveCurrentDraft() {
 
         if (!draft.value.trim()) {
@@ -1070,7 +1135,15 @@ function e(string $value): string
 
         const formData = new FormData();
 
+        const destinationSelect =
+            document.getElementById('destination');
+
         formData.set('id', draftId.value);
+
+        formData.set(
+            'destination_id',
+            destinationSelect.value
+        );
 
         formData.set(
             'post_type',
@@ -1873,6 +1946,15 @@ function e(string $value): string
             }
         }
     );
+
+    loadPublishingDestinations()
+        .catch((error) => {
+            console.error(error);
+
+            status.classList.add('error');
+            status.textContent =
+                error.message;
+        });
 
 })();
 </script>
