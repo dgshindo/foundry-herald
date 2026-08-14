@@ -5,6 +5,7 @@ declare(strict_types=1);
 use FoundryHerald\Config;
 use FoundryHerald\Repositories\PostRepository;
 use FoundryHerald\Services\FacebookPublisher;
+use FoundryHerald\Repositories\PublishingDestinationRepository;
 
 define('APP_ROOT', dirname(__DIR__, 2));
 

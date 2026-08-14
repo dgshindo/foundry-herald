@@ -10,8 +10,6 @@ use RuntimeException;
 final class FacebookPublisher
 {
     private string $graphVersion;
-    private string $pageId;
-    private string $pageAccessToken;
 
     public function __construct()
     {
@@ -19,32 +17,12 @@ final class FacebookPublisher
             'FACEBOOK_GRAPH_VERSION',
             'v26.0'
         );
-
-        $this->pageId = (string) Config::get(
-            'FACEBOOK_PAGE_ID',
-            ''
-        );
-
-        $this->pageAccessToken = (string) Config::get(
-            'FACEBOOK_PAGE_ACCESS_TOKEN',
-            ''
-        );
-
-        if ($this->pageId === '') {
-            throw new RuntimeException(
-                'FACEBOOK_PAGE_ID is not configured.'
-            );
-        }
-
-        if ($this->pageAccessToken === '') {
-            throw new RuntimeException(
-                'FACEBOOK_PAGE_ACCESS_TOKEN is not configured.'
-            );
-        }
     }
 
-    public function publishText(string $message): string
-    {
+    public function publishText(
+        array $destination,
+        string $message
+    ): string {
         $message = trim($message);
 
         if ($message === '') {
@@ -53,10 +31,53 @@ final class FacebookPublisher
             );
         }
 
+        if (
+            ($destination['platform'] ?? '') !== 'facebook'
+            || ($destination['destination_type'] ?? '') !== 'page'
+        ) {
+            throw new RuntimeException(
+                'Unsupported publishing destination.'
+            );
+        }
+
+        $pageId = trim(
+            (string) ($destination['external_id'] ?? '')
+        );
+
+        $tokenEnvKey = trim(
+            (string) ($destination['token_env_key'] ?? '')
+        );
+
+        if ($pageId === '') {
+            throw new RuntimeException(
+                'Facebook Page ID is missing.'
+            );
+        }
+
+        if ($tokenEnvKey === '') {
+            throw new RuntimeException(
+                'Facebook token environment key is missing.'
+            );
+        }
+
+        $pageAccessToken = (string) Config::get(
+            $tokenEnvKey,
+            ''
+        );
+
+        if ($pageAccessToken === '') {
+            throw new RuntimeException(
+                sprintf(
+                    'Facebook access token is not configured for %s.',
+                    $destination['name'] ?? 'this destination'
+                )
+            );
+        }
+
         $url = sprintf(
             'https://graph.facebook.com/%s/%s/feed',
             $this->graphVersion,
-            $this->pageId
+            $pageId
         );
 
         $ch = curl_init($url);
@@ -66,7 +87,7 @@ final class FacebookPublisher
             CURLOPT_POST => true,
             CURLOPT_POSTFIELDS => http_build_query([
                 'message' => $message,
-                'access_token' => $this->pageAccessToken,
+                'access_token' => $pageAccessToken,
             ]),
             CURLOPT_TIMEOUT => 60,
         ]);

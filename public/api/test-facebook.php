@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use FoundryHerald\Config;
+use FoundryHerald\Repositories\PublishingDestinationRepository;
 
 define('APP_ROOT', dirname(__DIR__, 2));
 
@@ -32,25 +33,58 @@ try {
         'v26.0'
     );
 
-    $pageId = (string) Config::get(
-        'FACEBOOK_PAGE_ID',
-        ''
+    $destinationRepository =
+        new PublishingDestinationRepository();
+
+    $destination =
+        $destinationRepository->findDefault();
+
+    if ($destination === null) {
+        throw new RuntimeException(
+            'No active publishing destination is configured.'
+        );
+    }
+
+    if (
+        ($destination['platform'] ?? '') !== 'facebook'
+        || ($destination['destination_type'] ?? '') !== 'page'
+    ) {
+        throw new RuntimeException(
+            'The default publishing destination is not a Facebook Page.'
+        );
+    }
+
+    $pageId = trim(
+        (string) ($destination['external_id'] ?? '')
     );
 
-    $token = (string) Config::get(
-        'FACEBOOK_PAGE_ACCESS_TOKEN',
-        ''
+    $tokenEnvKey = trim(
+        (string) ($destination['token_env_key'] ?? '')
     );
 
     if ($pageId === '') {
         throw new RuntimeException(
-            'FACEBOOK_PAGE_ID is not configured.'
+            'Facebook Page ID is missing from the publishing destination.'
         );
     }
 
+    if ($tokenEnvKey === '') {
+        throw new RuntimeException(
+            'Facebook token environment key is missing.'
+        );
+    }
+
+    $token = (string) Config::get(
+        $tokenEnvKey,
+        ''
+    );
+
     if ($token === '') {
         throw new RuntimeException(
-            'FACEBOOK_PAGE_ACCESS_TOKEN is not configured.'
+            sprintf(
+                'Facebook access token is not configured for %s.',
+                $destination['name'] ?? 'the default destination'
+            )
         );
     }
 
@@ -102,6 +136,7 @@ try {
 
     respond([
         'success' => true,
+        'destination' => $destination['name'],
         'page' => [
             'id' => $data['id'] ?? null,
             'name' => $data['name'] ?? null,
