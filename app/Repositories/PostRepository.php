@@ -281,4 +281,54 @@ final class PostRepository
             'publish_error' => $error,
         ]);
     }
+
+    public function claimForPublishing(int $id): void
+    {
+        $db = Database::connection();
+
+        $statement = $db->prepare(
+            '
+            UPDATE posts
+            SET
+                status = \'publishing\',
+                publish_error = NULL
+            WHERE id = :id
+            AND status = \'approved\'
+            '
+        );
+
+        $statement->execute([
+            'id' => $id,
+        ]);
+
+        if ($statement->rowCount() !== 1) {
+            throw new \RuntimeException(
+                'This post is not available for publishing. '
+                . 'It may already have been published or another publish request is in progress.'
+            );
+        }
+    }
+
+    public function releasePublishClaim(
+        int $id,
+        string $error
+    ): void {
+        $db = Database::connection();
+
+        $statement = $db->prepare(
+            '
+            UPDATE posts
+            SET
+                status = \'approved\',
+                publish_error = :publish_error
+            WHERE id = :id
+            AND status = \'publishing\'
+            '
+        );
+
+        $statement->execute([
+            'id' => $id,
+            'publish_error' => $error,
+        ]);
+    }
 }

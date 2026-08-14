@@ -36,6 +36,9 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $postId = (int) ($_POST['id'] ?? 0);
 
+$repository = null;
+$claimed = false;
+
 try {
     if ($postId <= 0) {
         throw new RuntimeException(
@@ -53,48 +56,62 @@ try {
         );
     }
 
+    if ($post['status'] === 'published') {
+        throw new RuntimeException(
+            'This post has already been published.'
+        );
+    }
+
     if ($post['status'] !== 'approved') {
         throw new RuntimeException(
             'Only approved posts may be published.'
         );
     }
 
-    $publisher =
-        new FacebookPublisher();
+    /*
+     * Atomic server-side guardrail.
+     * Only one request can move approved -> publishing.
+     */
+    $repository->claimForPublishing($postId);
+    $claimed = true;
 
-    $facebookPostId =
-        $publisher->publishText(
-            (string) $post['content']
-        );
+    $publisher = new FacebookPublisher();
+
+    $facebookPostId = $publisher->publishText(
+        (string) $post['content']
+    );
 
     $repository->markPublished(
         $postId,
         $facebookPostId
     );
 
+    $claimed = false;
+
     respond([
         'success' => true,
         'id' => $postId,
-        'facebook_post_id' =>
-            $facebookPostId,
-        'message' =>
-            'Published to House Dainislaav.',
+        'facebook_post_id' => $facebookPostId,
+        'message' => 'Published to House Dainislaav.',
     ]);
 
 } catch (Throwable $e) {
 
-    if ($postId > 0) {
+    /*
+     * If Facebook failed, release the claim and
+     * return the post to Approved so it can be retried.
+     */
+    if (
+        $claimed &&
+        $repository instanceof PostRepository
+    ) {
         try {
-            $repository =
-                $repository
-                ?? new PostRepository();
-
-            $repository->recordPublishError(
+            $repository->releasePublishClaim(
                 $postId,
                 $e->getMessage()
             );
         } catch (Throwable) {
-            // Preserve the original publishing error.
+            // Preserve original exception.
         }
     }
 

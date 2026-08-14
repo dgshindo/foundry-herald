@@ -472,6 +472,64 @@ function e(string $value): string
             background: #4267b2;
         }
 
+        #publish-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 99999;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            padding: 20px;
+
+            background: rgba(0, 0, 0, 0.8);
+        }
+
+        #publish-modal[hidden] {
+            display: none !important;
+        }
+
+        #publish-modal .publish-modal {
+            position: relative;
+
+            width: min(640px, 100%);
+            max-height: 90vh;
+            overflow-y: auto;
+
+            padding: 24px;
+
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+
+            box-shadow:
+                0 20px 60px rgba(0, 0, 0, 0.6);
+        }
+
+        #publish-modal .publish-preview {
+            max-height: 320px;
+            overflow-y: auto;
+
+            margin: 18px 0;
+            padding: 16px;
+
+            white-space: pre-wrap;
+            line-height: 1.55;
+
+            background: var(--surface-secondary);
+            border: 1px solid var(--border);
+            border-radius: 5px;
+        }
+
+        #publish-modal .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+
+            margin-top: 20px;
+        }
+
         @media (max-width: 700px) {
             .history-item {
                 grid-template-columns: 1fr;
@@ -689,6 +747,54 @@ function e(string $value): string
 
 </section>
 
+
+<div
+    id="publish-modal"
+    class="modal-backdrop"
+    hidden
+>
+    <div class="publish-modal">
+
+        <h2>Publish to Facebook?</h2>
+
+        <p class="publish-destination">
+            House Dainislaav
+        </p>
+
+        <div
+            id="publish-preview"
+            class="publish-preview"
+        ></div>
+
+        <p class="publish-warning">
+            This will immediately publish the approved post
+            to the House Dainislaav Facebook Page.
+        </p>
+
+        <div class="modal-actions">
+
+            <button
+                type="button"
+                id="cancel-publish-button"
+                class="secondary-button"
+            >
+                Cancel
+            </button>
+
+            <button
+                type="button"
+                id="confirm-publish-button"
+                class="publish-button"
+            >
+                Publish Now
+            </button>
+
+        </div>
+
+    </div>
+</div>
+
+
 </div>
 
 <script>
@@ -737,6 +843,22 @@ function e(string $value): string
             'publish-button'
         );
 
+    const publishModal =
+        document.getElementById('publish-modal');
+
+    const publishPreview =
+        document.getElementById('publish-preview');
+
+    const cancelPublishButton =
+        document.getElementById(
+            'cancel-publish-button'
+        );
+
+    const confirmPublishButton =
+        document.getElementById(
+            'confirm-publish-button'
+        );
+    
     const postTypeLabels = {
         auto: 'Let Herald Decide',
         forge_reflection: 'Forge Reflection',
@@ -1566,6 +1688,10 @@ function e(string $value): string
                 'is-busy'
             );
         }
+        if (post.status === 'published') {
+            draftStatus.textContent =
+                'Published to Facebook.';
+        }
     }
 
     refreshHistoryButton.addEventListener(
@@ -1593,7 +1719,7 @@ function e(string $value): string
 
     publishButton.addEventListener(
         'click',
-        async () => {
+        () => {
 
             if (
                 !draftId.value ||
@@ -1602,21 +1728,42 @@ function e(string $value): string
                 return;
             }
 
-            const confirmed = window.confirm(
-                'Publish this post to the House Dainislaav Facebook Page?'
-            );
+            publishPreview.textContent =
+                draft.value;
 
-            if (!confirmed) {
+            publishModal.hidden = false;
+        }
+    );
+
+    cancelPublishButton.addEventListener(
+        'click',
+        () => {
+            publishModal.hidden = true;
+        }
+    );
+
+    confirmPublishButton.addEventListener(
+        'click',
+        async () => {
+
+            if (
+                !draftId.value ||
+                confirmPublishButton.disabled
+            ) {
                 return;
             }
 
             const originalText =
-                publishButton.textContent;
+                confirmPublishButton.textContent;
 
             try {
-                publishButton.disabled = true;
-                publishButton.textContent =
+                confirmPublishButton.disabled = true;
+                cancelPublishButton.disabled = true;
+
+                confirmPublishButton.textContent =
                     'Publishing...';
+
+                publishButton.disabled = true;
 
                 document.body.classList.add(
                     'is-busy'
@@ -1661,11 +1808,19 @@ function e(string $value): string
                     );
                 }
 
+                publishModal.hidden = true;
+
                 draftStatus.textContent =
-                    data.message;
+                    'Published to House Dainislaav.';
 
                 publishButton.hidden = true;
                 publishButton.disabled = true;
+
+                saveDraftButton.disabled = true;
+                approveButton.disabled = true;
+                rejectButton.disabled = true;
+
+                draft.readOnly = true;
 
                 await loadRecentPosts();
 
@@ -1681,16 +1836,40 @@ function e(string $value): string
                     error.message ||
                     'Unable to publish post.';
 
+                /*
+                * API restored the post to approved,
+                * so retry remains available.
+                */
                 publishButton.disabled = false;
 
             } finally {
 
-                publishButton.textContent =
+                confirmPublishButton.disabled =
+                    false;
+
+                cancelPublishButton.disabled =
+                    false;
+
+                confirmPublishButton.textContent =
                     originalText;
 
                 document.body.classList.remove(
                     'is-busy'
                 );
+            }
+        }
+    );
+
+    document.addEventListener(
+        'keydown',
+        (event) => {
+
+            if (
+                event.key === 'Escape' &&
+                !publishModal.hidden &&
+                !confirmPublishButton.disabled
+            ) {
+                publishModal.hidden = true;
             }
         }
     );
