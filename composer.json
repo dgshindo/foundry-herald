@@ -1,6 +1,6 @@
 {
     "name": "sonic-foundry/foundry-herald",
-    "description": "A brand-aware content agent for House Dainislaav.",
+    "description": "Foundry Herald: a multi-brand content generation and publishing agent.",
     "type": "project",
     "require": {
         "php": "^8.1",

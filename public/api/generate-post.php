@@ -96,16 +96,35 @@ try {
         );
     }
 
+    $resolvedKnowledgePath =
+        APP_ROOT . '/' . trim($knowledgePath, '/\\');
+
     $knowledgeLoader = new KnowledgeLoader(
-        APP_ROOT . '/' . trim($knowledgePath, '/\\')
+        $resolvedKnowledgePath
     );
 
-    $context = $knowledgeLoader->buildContext([
-        'house-dainislaav.md',
-        'voice-and-tone.md',
-        'content-rules.md',
-        'content-voices.md',
-    ]);
+    $knowledgeFiles = glob(
+        $resolvedKnowledgePath . DIRECTORY_SEPARATOR . '*.md'
+    );
+
+    if ($knowledgeFiles === false || $knowledgeFiles === []) {
+        throw new RuntimeException(
+            'No knowledge files were found for '
+            . $destination['name']
+            . '.'
+        );
+    }
+
+    $knowledgeFiles = array_map(
+        'basename',
+        $knowledgeFiles
+    );
+
+    sort($knowledgeFiles);
+
+    $context = $knowledgeLoader->buildContext(
+        $knowledgeFiles
+    );
 
     $postRepository = new PostRepository();
 

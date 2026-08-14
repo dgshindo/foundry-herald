@@ -555,7 +555,7 @@ function e(string $value): string
         <h1>Foundry Herald</h1>
 
         <p>
-            House Dainislaav Content Agent
+            Content Agent for the Foundry
         </p>
     </header>
 
@@ -763,19 +763,20 @@ function e(string $value): string
 
         <h2>Publish to Facebook?</h2>
 
-        <p class="publish-destination">
-            House Dainislaav
-        </p>
+        <p
+            id="publish-destination"
+            class="publish-destination"
+        ></p>
 
         <div
             id="publish-preview"
             class="publish-preview"
         ></div>
 
-        <p class="publish-warning">
-            This will immediately publish the approved post
-            to the House Dainislaav Facebook Page.
-        </p>
+        <p
+            id="publish-warning"
+            class="publish-warning"
+        ></p>
 
         <div class="modal-actions">
 
@@ -867,6 +868,16 @@ function e(string $value): string
 
     const destinationSelect =
         document.getElementById('destination');
+
+    const publishDestination =
+        document.getElementById(
+            'publish-destination'
+        );
+
+    const publishWarning =
+        document.getElementById(
+            'publish-warning'
+        );
     
     const postTypeLabels = {
         auto: 'Let Herald Decide',
@@ -1624,6 +1635,22 @@ function e(string $value): string
 
             const post = data.post;
 
+            if (
+                post.publishing_destination_id &&
+                destinationSelect.querySelector(
+                    `option[value="${CSS.escape(
+                        String(
+                            post.publishing_destination_id
+                        )
+                    )}"]`
+                )
+            ) {
+                destinationSelect.value =
+                    String(
+                        post.publishing_destination_id
+                    );
+            }
+
             draftId.value = post.id;
             draft.value = post.content ?? '';
 
@@ -1801,8 +1828,27 @@ function e(string $value): string
                 return;
             }
 
+            const selectedOption =
+                destinationSelect.options[
+                    destinationSelect.selectedIndex
+                ];
+
+            const destinationName =
+                selectedOption?.textContent
+                    ?.trim()
+                || 'Facebook';
+
             publishPreview.textContent =
                 draft.value;
+
+            publishDestination.textContent =
+                destinationName;
+
+            publishWarning.textContent =
+                'This will immediately publish the approved post '
+                + 'to the '
+                + destinationName
+                + ' Facebook Page.';
 
             publishModal.hidden = false;
         }
@@ -1884,7 +1930,8 @@ function e(string $value): string
                 publishModal.hidden = true;
 
                 draftStatus.textContent =
-                    'Published to House Dainislaav.';
+                    data.message ||
+                    'Published to Facebook.';
 
                 publishButton.hidden = true;
                 publishButton.disabled = true;
