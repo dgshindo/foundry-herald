@@ -13,28 +13,12 @@ Config::load(APP_ROOT);
 
 $db = Database::connection();
 
-
-
-$postTypes = [
-    'auto' => 'Let Herald Decide',
-    'forge_reflection' => 'Forge Reflection',
-    'song_promotion' => 'Song Promotion',
-    'lyric_spotlight' => 'Lyric Spotlight',
-    'behind_the_music' => 'Behind the Music',
-    'mythic_adventures' => 'Mythic Adventures / LARP',
-    'creator_developer' => 'Creator / Developer',
-    'humor' => 'Humor / Meme',
-    'engagement' => 'Engagement Question',
-    'house_lore' => 'House / Iron Voice',
-];
-
 $imageOptions = [
     'auto' => 'Auto',
     'yes' => 'Yes',
     'no' => 'No',
 ];
 
-$selectedPostType = $_POST['post_type'] ?? 'auto';
 $topic = trim($_POST['topic'] ?? '');
 $imagePreference = $_POST['image_preference'] ?? 'auto';
 
@@ -593,19 +577,11 @@ function e(string $value): string
                     <select
                         id="post_type"
                         name="post_type"
+                        required
                     >
-                        <?php foreach ($postTypes as $value => $label): ?>
-
-                            <option
-                                value="<?= e($value) ?>"
-                                <?= $selectedPostType === $value
-                                    ? 'selected'
-                                    : '' ?>
-                            >
-                                <?= e($label) ?>
-                            </option>
-
-                        <?php endforeach; ?>
+                        <option value="">
+                            Select a brand first...
+                        </option>
                     </select>
                 </div>
 
@@ -869,6 +845,9 @@ function e(string $value): string
     const destinationSelect =
         document.getElementById('destination');
 
+    const postTypeSelect =
+        document.getElementById('post_type');
+
     const publishDestination =
         document.getElementById(
             'publish-destination'
@@ -879,18 +858,69 @@ function e(string $value): string
             'publish-warning'
         );
     
-    const postTypeLabels = {
-        auto: 'Let Herald Decide',
-        forge_reflection: 'Forge Reflection',
-        song_promotion: 'Song Promotion',
-        lyric_spotlight: 'Lyric Spotlight',
-        behind_the_music: 'Behind the Music',
-        mythic_adventures: 'Mythic Adventures / LARP',
-        creator_developer: 'Creator / Developer',
-        humor: 'Humor / Meme',
-        engagement: 'Engagement Question',
-        house_lore: 'House / Iron Voice'
-    };
+    const postTypeLabels = {};
+
+    async function loadPostTypes(
+        destinationId,
+        selectedValue = 'auto'
+    ) {
+        postTypeSelect.disabled = true;
+
+        postTypeSelect.innerHTML =
+            '<option value="">Loading post types...</option>';
+
+        const response = await fetch(
+            '/api/post-types.php?destination_id='
+            + encodeURIComponent(destinationId),
+            {
+                headers: {
+                    'Accept': 'application/json'
+                }
+            }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+            throw new Error(
+                data.error ||
+                'Unable to load post types.'
+            );
+        }
+
+        postTypeSelect.innerHTML = '';
+
+        /*
+        * Rebuild our label lookup because Recent Content
+        * uses it when displaying posts.
+        */
+        for (const key of Object.keys(postTypeLabels)) {
+            delete postTypeLabels[key];
+        }
+
+        for (const postType of data.post_types) {
+
+            postTypeLabels[postType.value] =
+                postType.label;
+
+            const option =
+                document.createElement('option');
+
+            option.value =
+                postType.value;
+
+            option.textContent =
+                postType.label;
+
+            if (postType.value === selectedValue) {
+                option.selected = true;
+            }
+
+            postTypeSelect.appendChild(option);
+        }
+
+        postTypeSelect.disabled = false;
+    }
 
     if (
         !form ||
@@ -904,7 +934,16 @@ function e(string $value): string
         !approveButton ||
         !rejectButton ||
         !recentContent ||
-        !refreshHistoryButton
+        !refreshHistoryButton ||
+        !destinationSelect ||
+        !postTypeSelect ||
+        !publishButton ||
+        !publishModal ||
+        !publishPreview ||
+        !publishDestination ||
+        !publishWarning ||
+        !cancelPublishButton ||
+        !confirmPublishButton
     ) {
         console.error(
             'Foundry Herald UI initialization failed.',
@@ -928,6 +967,33 @@ function e(string $value): string
     }
 
     let generating = false;
+    let publishingDestinations = [];
+
+    function getSelectedDestination() {
+        return publishingDestinations.find(
+            (destination) => String(destination.id) === destinationSelect.value
+        ) || null;
+    }
+
+    function configureApprovedAction(isApproved = false) {
+        const destination = getSelectedDestination();
+
+        if (!isApproved || !destination) {
+            publishButton.hidden = true;
+            publishButton.disabled = true;
+            return;
+        }
+
+        const isManual =
+            destination.platform === 'linkedin' &&
+            destination.destination_type === 'manual';
+
+        publishButton.textContent = isManual
+            ? 'Copy LinkedIn Post'
+            : 'Publish to Facebook';
+        publishButton.hidden = false;
+        publishButton.disabled = false;
+    }
 
     form.addEventListener('submit', async (event) => {
 
@@ -954,17 +1020,30 @@ function e(string $value): string
 
         const formData = new FormData(form);
 
-        const postTypeSelect =
-            document.getElementById('post_type');
+        const selectedPostTypeValue =
+            postTypeSelect.value;
 
-        const selectedPostType =
+        if (!selectedPostTypeValue) {
+            generating = false;
+            generateButton.disabled = false;
+
+            document.body.classList.remove('is-busy');
+            draft.classList.remove('is-generating');
+
+            status.classList.add('error');
+            status.textContent =
+                'Please select a post type.';
+            return;
+        }
+
+        const selectedPostTypeLabel =
             postTypeSelect.options[
                 postTypeSelect.selectedIndex
             ].text;
 
         formData.set(
             'post_type',
-            selectedPostType
+            selectedPostTypeValue
         );
 
         try {
@@ -1013,7 +1092,7 @@ function e(string $value): string
                 document.createElement('span');
 
             typeTag.className = 'tag';
-            typeTag.textContent = selectedPostType;
+            typeTag.textContent = selectedPostTypeLabel;
 
             const imageTag =
                 document.createElement('span');
@@ -1092,9 +1171,10 @@ function e(string $value): string
             );
         }
 
+        publishingDestinations = data.destinations || [];
         destinationSelect.innerHTML = '';
 
-        for (const destination of data.destinations) {
+        for (const destination of publishingDestinations) {
             const option =
                 document.createElement('option');
 
@@ -1111,7 +1191,7 @@ function e(string $value): string
             destinationSelect.appendChild(option);
         }
 
-        if (data.destinations.length === 0) {
+        if (publishingDestinations.length === 0) {
             const option =
                 document.createElement('option');
 
@@ -1121,9 +1201,49 @@ function e(string $value): string
 
             destinationSelect.appendChild(option);
 
+            postTypeSelect.innerHTML =
+                '<option value="">No post types available</option>';
+            postTypeSelect.disabled = true;
             generateButton.disabled = true;
+            return;
+        }
+
+        if (destinationSelect.value) {
+            await loadPostTypes(
+                destinationSelect.value
+            );
         }
     }
+
+    destinationSelect.addEventListener(
+        'change',
+        async () => {
+            configureApprovedAction(false);
+
+            if (!destinationSelect.value) {
+                postTypeSelect.innerHTML =
+                    '<option value="">Select a brand first...</option>';
+                postTypeSelect.disabled = true;
+                return;
+            }
+
+            try {
+                status.classList.remove('error');
+                status.textContent = '';
+
+                await loadPostTypes(
+                    destinationSelect.value
+                );
+            } catch (error) {
+                console.error(error);
+
+                status.classList.add('error');
+                status.textContent =
+                    error.message ||
+                    'Unable to load post types.';
+            }
+        }
+    );
 
     async function saveCurrentDraft() {
 
@@ -1132,9 +1252,6 @@ function e(string $value): string
                 'Draft content cannot be empty.'
             );
         }
-
-        const postTypeSelect =
-            document.getElementById('post_type');
 
         const imagePreferenceSelect =
             document.getElementById(
@@ -1349,12 +1466,10 @@ function e(string $value): string
             rejectButton.disabled = true;
 
             if (status === 'approved') {
-                publishButton.hidden = false;
-                publishButton.disabled = false;
+                configureApprovedAction(true);
             }
             if (status === 'rejected') {
-                publishButton.hidden = true;
-                publishButton.disabled = true;
+                configureApprovedAction(false);
             }
 
         } catch (error) {
@@ -1650,15 +1765,16 @@ function e(string $value): string
                         post.publishing_destination_id
                     );
             }
+            await loadPostTypes(
+                post.publishing_destination_id,
+                post.post_type
+            );
 
             draftId.value = post.id;
             draft.value = post.content ?? '';
 
             const topicField =
                 document.getElementById('topic');
-
-            const postTypeSelect =
-                document.getElementById('post_type');
 
             const imagePreferenceSelect =
                 document.getElementById(
@@ -1667,11 +1783,7 @@ function e(string $value): string
             const canPublish =
                 post.status === 'approved';
 
-            publishButton.hidden =
-                !canPublish;
-
-            publishButton.disabled =
-                !canPublish;
+            configureApprovedAction(canPublish);
 
             topicField.value =
                 post.topic ?? '';
@@ -1788,10 +1900,7 @@ function e(string $value): string
                 'is-busy'
             );
         }
-        if (post.status === 'published') {
-            draftStatus.textContent =
-                'Published to Facebook.';
-        }
+
     }
 
     refreshHistoryButton.addEventListener(
@@ -1828,22 +1937,38 @@ function e(string $value): string
                 return;
             }
 
-            const selectedOption =
-                destinationSelect.options[
-                    destinationSelect.selectedIndex
-                ];
+            const destination = getSelectedDestination();
 
-            const destinationName =
-                selectedOption?.textContent
-                    ?.trim()
-                || 'Facebook';
+            if (!destination) {
+                draftStatus.classList.add('error');
+                draftStatus.textContent = 'Publishing destination not found.';
+                return;
+            }
 
-            publishPreview.textContent =
-                draft.value;
+            const isManual =
+                destination.platform === 'linkedin' &&
+                destination.destination_type === 'manual';
 
-            publishDestination.textContent =
-                destinationName;
+            if (isManual) {
+                navigator.clipboard.writeText(draft.value)
+                    .then(() => {
+                        draftStatus.classList.remove('error');
+                        draftStatus.textContent =
+                            'Copied. Ready to paste into LinkedIn.';
+                    })
+                    .catch((error) => {
+                        console.error(error);
+                        draftStatus.classList.add('error');
+                        draftStatus.textContent =
+                            'Unable to copy the LinkedIn post.';
+                    });
+                return;
+            }
 
+            const destinationName = destination.name || 'Facebook';
+
+            publishPreview.textContent = draft.value;
+            publishDestination.textContent = destinationName;
             publishWarning.textContent =
                 'This will immediately publish the approved post '
                 + 'to the '

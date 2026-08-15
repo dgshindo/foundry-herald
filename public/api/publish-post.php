@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 use FoundryHerald\Config;
 use FoundryHerald\Repositories\PostRepository;
-use FoundryHerald\Services\FacebookPublisher;
 use FoundryHerald\Repositories\PublishingDestinationRepository;
+use FoundryHerald\Services\FacebookPublisher;
 
 define('APP_ROOT', dirname(__DIR__, 2));
 
@@ -70,35 +70,39 @@ try {
     }
 
     /*
-     * Atomic server-side guardrail.
-     * Only one request can move approved -> publishing.
+     * Resolve the selected publishing destination.
+     * If the post does not yet have one assigned,
+     * fall back to the active default destination.
      */
-    $repository->claimForPublishing($postId);
-    $claimed = true;
+    $destinationRepository =
+        new PublishingDestinationRepository();
 
     $destinationId = (int) (
         $post['publishing_destination_id'] ?? 0
     );
 
-    if ($destinationId <= 0) {
-        throw new RuntimeException(
-            'This post does not have a publishing destination.'
-        );
+    if ($destinationId > 0) {
+        $destination =
+            $destinationRepository->findById(
+                $destinationId
+            );
+    } else {
+        $destination =
+            $destinationRepository->findDefault();
     }
-
-    $destinationRepository =
-        new PublishingDestinationRepository();
-
-    $destination =
-        $destinationRepository->findById(
-            $destinationId
-        );
 
     if ($destination === null) {
         throw new RuntimeException(
-            'The publishing destination could not be found.'
+            'No active publishing destination is available.'
         );
     }
+
+    /*
+     * Atomic server-side guardrail.
+     * Only one request can move approved -> publishing.
+     */
+    $repository->claimForPublishing($postId);
+    $claimed = true;
 
     $publisher = new FacebookPublisher();
 
@@ -119,14 +123,17 @@ try {
         'success' => true,
         'id' => $postId,
         'facebook_post_id' => $facebookPostId,
-        'message' => 'Published to ' . ($destination['name'] ?? 'Facebook') . '.',
+        'destination' => $destination['name'],
+        'message' =>
+            'Published to ' . $destination['name'] . '.',
     ]);
 
 } catch (Throwable $e) {
 
     /*
-     * If Facebook failed, release the claim and
-     * return the post to Approved so it can be retried.
+     * If Facebook publishing fails after the post has
+     * been claimed, restore it to Approved so it can
+     * safely be retried.
      */
     if (
         $claimed &&
@@ -138,7 +145,7 @@ try {
                 $e->getMessage()
             );
         } catch (Throwable) {
-            // Preserve original exception.
+            // Preserve the original publishing error.
         }
     }
 

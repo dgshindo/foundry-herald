@@ -47,6 +47,12 @@ try {
                     'slug' =>
                         $destination['slug'],
 
+                    'platform' =>
+                        $destination['platform'],
+
+                    'destination_type' =>
+                        $destination['destination_type'],
+
                     'is_default' =>
                         (bool) $destination['is_default'],
                 ];
