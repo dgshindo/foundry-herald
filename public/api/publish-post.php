@@ -6,12 +6,15 @@ use FoundryHerald\Config;
 use FoundryHerald\Repositories\PostRepository;
 use FoundryHerald\Repositories\PublishingDestinationRepository;
 use FoundryHerald\Services\FacebookPublisher;
+use FoundryHerald\Services\AuthService;
 
 define('APP_ROOT', dirname(__DIR__, 2));
 
 require APP_ROOT . '/vendor/autoload.php';
 
 Config::load(APP_ROOT);
+
+AuthService::requireApi();
 
 header('Content-Type: application/json; charset=utf-8');
 

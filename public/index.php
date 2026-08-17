@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 use FoundryHerald\Config;
 use FoundryHerald\Database;
+use FoundryHerald\Services\AuthService;
 
 define('APP_ROOT', dirname(__DIR__));
 
 require APP_ROOT . '/vendor/autoload.php';
 
 Config::load(APP_ROOT);
+
+AuthService::requireWeb();
 
 $db = Database::connection();
 
@@ -985,12 +988,22 @@ function e(string $value): string
         }
 
         const isManual =
-            destination.platform === 'linkedin' &&
             destination.destination_type === 'manual';
 
-        publishButton.textContent = isManual
-            ? 'Copy LinkedIn Post'
-            : 'Publish to Facebook';
+        if (isManual) {
+            const platformLabel =
+                destination.platform === 'linkedin'
+                    ? 'LinkedIn'
+                    : destination.platform === 'facebook'
+                        ? 'Facebook'
+                        : 'Post';
+
+            publishButton.textContent =
+                'Copy ' + platformLabel + ' Post';
+        } else {
+            publishButton.textContent =
+                'Publish to Facebook';
+        }
         publishButton.hidden = false;
         publishButton.disabled = false;
     }
@@ -1946,21 +1959,31 @@ function e(string $value): string
             }
 
             const isManual =
-                destination.platform === 'linkedin' &&
                 destination.destination_type === 'manual';
 
             if (isManual) {
+                const platformLabel =
+                    destination.platform === 'linkedin'
+                        ? 'LinkedIn'
+                        : destination.platform === 'facebook'
+                            ? 'Facebook'
+                            : 'the destination';
+
                 navigator.clipboard.writeText(draft.value)
                     .then(() => {
                         draftStatus.classList.remove('error');
                         draftStatus.textContent =
-                            'Copied. Ready to paste into LinkedIn.';
+                            'Copied. Ready to paste into '
+                            + platformLabel
+                            + '.';
                     })
                     .catch((error) => {
                         console.error(error);
                         draftStatus.classList.add('error');
                         draftStatus.textContent =
-                            'Unable to copy the LinkedIn post.';
+                            'Unable to copy the '
+                            + platformLabel
+                            + ' post.';
                     });
                 return;
             }
